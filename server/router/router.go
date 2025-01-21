@@ -39,6 +39,7 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
     // Public Routes
     r.POST("/signup", userHandler.CreateUser)
     r.POST("/login", userHandler.Login)
+    r.POST("/auth/refresh-token", userHandler.RefreshToken) // Added Refresh Token Endpoint
     r.GET("/logout", userHandler.Logout)
 
     // Validate Token Route
@@ -64,14 +65,14 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 
     // OPTIONS Handler
     r.OPTIONS("/*path", func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Connection", "Upgrade")
-		c.Header("Upgrade", "websocket")
-		c.AbortWithStatus(204)
-	})	
+        c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
+        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        c.Header("Access-Control-Allow-Credentials", "true")
+        c.Header("Connection", "Upgrade")
+        c.Header("Upgrade", "websocket")
+        c.AbortWithStatus(204)
+    })
 }
 
 func Start(addr string) error {

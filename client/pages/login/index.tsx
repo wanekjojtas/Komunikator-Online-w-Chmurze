@@ -23,57 +23,67 @@ const IndexPage = () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
     return passwordRegex.test(password);
   };
-  
 
   const handleLogin = async (e: React.SyntheticEvent) => {
     e.preventDefault();
+    setMessage(""); // Clear previous messages
+
+    if (!email || !password) {
+      setMessage("Please enter both email and password.");
+      return;
+    }
 
     try {
-        const res = await fetch(`${API_URL}/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-        });
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-        if (res.ok) {
-            const data = await res.json();
-            
-            // Store user info and token in localStorage
-            localStorage.setItem("user_info", JSON.stringify({ id: data.id, username: data.username }));
-            localStorage.setItem("jwt", data.token);
+      const data = await res.json();
 
-            // Update AuthContext state
-            setUser({ id: data.id, username: data.username });
-            setAuthenticated(true);
+      if (res.ok) {
+        localStorage.setItem("user_info", JSON.stringify({ id: data.id, username: data.username }));
+        localStorage.setItem("jwt", data.token);
 
-            // Redirect to home page
-            router.push("/");
-        } else {
-            const error = await res.json();
-            setMessage(error.error || "Failed to log in");
-        }
+        setUser({ id: data.id, username: data.username });
+        setAuthenticated(true);
+
+        router.push("/");
+      } else {
+        setMessage(data.error || "Invalid email or password.");
+      }
     } catch (err) {
-        console.error("Login error:", err);
-        setMessage("An error occurred during login.");
+      console.error("Login error:", err);
+      setMessage("An unexpected error occurred. Please try again.");
     }
   };
 
-
   const handleSignUp = async (e: React.SyntheticEvent) => {
     e.preventDefault();
-  
-    if (!validatePassword(password)) {
-      setMessage("Password must be at least 8 characters long, include one capital letter, one number, and one special character.");
+    setMessage(""); // Clear previous messages
+
+    if (!username || !email || !password) {
+      setMessage("All fields are required.");
       return;
     }
-  
+
+    if (!validatePassword(password)) {
+      setMessage(
+        "Password must be at least 8 characters long, include one capital letter, one number, and one special character."
+      );
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
       });
-  
+
+      const data = await res.json();
+
       if (res.ok) {
         setMessage("User created successfully! You can now log in.");
         setIsSignUp(false);
@@ -81,20 +91,36 @@ const IndexPage = () => {
         setEmail("");
         setPassword("");
       } else {
-        const error = await res.json();
-        if (error.error === "Email already exists") {
-          setMessage("The email address is already in use.");
-        } else if (error.error === "Username already exists") {
-          setMessage("The username is already taken.");
-        } else {
-          setMessage(error.error || "Failed to create user.");
+        switch (data.error) {
+          case "email_already_exists":
+            setMessage("The email address is already in use.");
+            break;
+          case "username_already_exists":
+            setMessage("The username is already taken.");
+            break;
+          case "invalid_email_format":
+            setMessage("The email format is invalid.");
+            break;
+          case "password_too_short":
+            setMessage("The password does not meet the required criteria.");
+            break;
+          default:
+            setMessage(data.error || "Failed to create user.");
         }
       }
     } catch (err) {
-      console.error(err);
-      setMessage("An error occurred during sign-up.");
+      console.error("Sign-up error:", err);
+      setMessage("An unexpected error occurred during sign-up.");
     }
-  };  
+  };
+
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    setUsername(""); // Clear fields
+    setEmail("");
+    setPassword("");
+    setMessage(""); // Clear messages
+  };
 
   return (
     <div className="flex items-center justify-center min-w-full min-h-screen">
@@ -135,7 +161,7 @@ const IndexPage = () => {
         <div className="mt-4 text-center">
           <span
             className="text-blue-500 cursor-pointer"
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={toggleMode}
           >
             {isSignUp
               ? "Already have an account? Login"

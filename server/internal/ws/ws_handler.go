@@ -42,7 +42,7 @@ func (h *Handler) ValidateToken(c *gin.Context) {
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
-	claims, err := util.ValidateJWT(token)
+	claims, err := util.ValidateToken(token,false)
 	if err != nil {
 		log.Printf("Token validation failed: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
@@ -254,7 +254,7 @@ func (h *Handler) JoinChat(c *gin.Context) {
         return
     }
 
-    claims, err := util.ValidateJWT(token)
+    claims, err := util.ValidateToken(token,false)
     if err != nil || claims.ID != userID || claims.Username != username {
         log.Printf("Invalid token or token mismatch for user: %s", username)
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -597,7 +597,7 @@ func (h *Handler) GetAllUsers(c *gin.Context) {
     }
 
     token = strings.TrimPrefix(token, "Bearer ")
-    claims, err := util.ValidateJWT(token)
+    claims, err := util.ValidateToken(token,false)
     if err != nil {
         log.Printf("Token validation failed: %v", err)
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})

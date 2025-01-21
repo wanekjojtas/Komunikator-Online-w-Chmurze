@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext } from "react";
+import { useRouter } from "next/router";
 import { API_URL } from "../constants";
 import { AuthContext } from "../modules/auth_provider";
 import { WebSocketContext } from "@/modules/websocket_provider";
@@ -12,119 +13,145 @@ const Index = () => {
     const [newMessage, setNewMessage] = useState("");
     const { user } = useContext(AuthContext);
     const { conn, setConn } = useContext(WebSocketContext);
+    const router = useRouter();
+
+    const redirectToLogin = () => {
+        console.warn("No valid JWT token found. Redirecting to login...");
+        localStorage.removeItem("jwt");
+        localStorage.removeItem("user_info");
+        router.push("/login");
+    };
 
     // Fetch all users on component mount
     useEffect(() => {
         const fetchAllUsers = async () => {
             try {
                 const token = localStorage.getItem("jwt");
-                if (!token) throw new Error("No JWT token found.");
-    
+                if (!token) {
+                    redirectToLogin();
+                    return;
+                }
+
                 const res = await fetch(`${API_URL}/users/all`, {
                     method: "GET",
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
                 });
-    
-                if (!res.ok) throw new Error("Failed to fetch users.");
+
+                if (!res.ok) {
+                    if (res.status === 401) redirectToLogin();
+                    else throw new Error("Failed to fetch users.");
+                }
+
                 const data = await res.json();
-    
-                // Add the current user to the list
                 const currentUser = { id: user?.id, username: user?.username };
                 const uniqueUsers = [...data, currentUser].filter(
                     (value, index, self) =>
                         index === self.findIndex((u) => u.id === value.id)
                 );
-    
+
                 setUsers(uniqueUsers || []);
             } catch (error) {
                 console.error("Error fetching all users:", error);
+                redirectToLogin();
             }
         };
-    
+
         fetchAllUsers();
     }, [user?.id, user?.username]);
-    
 
     // Fetch chats on component mount
     useEffect(() => {
         if (!user?.id) return;
-    
+
         const fetchChats = async () => {
             try {
                 const token = localStorage.getItem("jwt");
-                if (!token) throw new Error("No JWT token found.");
-    
+                if (!token) {
+                    redirectToLogin();
+                    return;
+                }
+
                 const res = await fetch(`${API_URL}/ws/getUserChats`, {
                     method: "GET",
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
                 });
-    
-                if (!res.ok) throw new Error("Failed to fetch chats.");
-    
+
+                if (!res.ok) {
+                    if (res.status === 401) redirectToLogin();
+                    else throw new Error("Failed to fetch chats.");
+                }
+
                 const data = await res.json();
-                setChats(data || []); // Use data as provided by backend
+                setChats(data || []);
             } catch (error) {
                 console.error("Error fetching chats:", error);
-                setChats([]); // Prevent further issues by resetting state
+                redirectToLogin();
             }
         };
-    
+
         fetchChats();
-        }, [user?.id]);
-    
+    }, [user?.id]);
 
     // WebSocket connection
     useEffect(() => {
         if (!selectedChat?.id || !user) return;
-    
+
         let ws: WebSocket | null = null;
         let reconnectTimeout: NodeJS.Timeout;
-    
+
         const connectWebSocket = () => {
+            const token = localStorage.getItem("jwt");
+            if (!token) {
+                redirectToLogin();
+                return;
+            }
+
             ws = new WebSocket(
-                `${API_URL.replace("http", "ws")}/ws/joinChat/${selectedChat.id}?userID=${user.id}&username=${user.username}&token=${localStorage.getItem("jwt")}`
+                `${API_URL.replace("http", "ws")}/ws/joinChat/${selectedChat.id}?userID=${user.id}&username=${user.username}&token=${token}`
             );
-    
+
             ws.onopen = () => {
                 console.log(`Connected to chat: ${selectedChat.name}`);
             };
-    
+
             ws.onmessage = (event) => {
                 const newMessage = JSON.parse(event.data);
                 setMessages((prev) => [...prev, newMessage]);
             };
-    
+
             ws.onclose = (event) => {
                 console.log("WebSocket connection closed:", event.code, event.reason);
-    
-                if (event.code !== 1000) {
-                    console.log("Attempting to reconnect...");
-                    reconnectTimeout = setTimeout(() => connectWebSocket(), 3000); // Retry after 3 seconds
+
+                if (event.code === 4001 || event.reason.toLowerCase().includes("token")) {
+                    redirectToLogin();
+                } else if (event.code !== 1000) {
+                    reconnectTimeout = setTimeout(connectWebSocket, 3000);
                 }
             };
-    
+
             ws.onerror = (error) => {
                 console.error("WebSocket error:", error);
+                redirectToLogin();
             };
-    
+
             setConn(ws);
         };
-    
+
         connectWebSocket();
-    
+
         return () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.close(1000, "Client disconnected");
             }
             clearTimeout(reconnectTimeout);
             setConn(null);
-            setMessages([]); // Clear messages when leaving the chat
+            setMessages([]);
         };
-    }, [selectedChat?.id, user, setConn]);
+        }, [selectedChat?.id, user, setConn]);
     
 
     const handleSearch = async (query: string) => {
