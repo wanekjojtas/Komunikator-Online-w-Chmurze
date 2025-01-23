@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback } from "react";
 import { useRouter } from "next/router";
 import { API_URL } from "../constants";
 import { AuthContext } from "../modules/auth_provider";
@@ -12,15 +12,15 @@ const Index = () => {
     const [messages, setMessages] = useState<{ id: string; username: string; content: string; createdAt: string }[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const { user } = useContext(AuthContext);
-    const { conn, setConn } = useContext(WebSocketContext);
+    const { setConn } = useContext(WebSocketContext);
     const router = useRouter();
 
-    const redirectToLogin = () => {
+    const redirectToLogin = useCallback(() => {
         console.warn("No valid JWT token found. Redirecting to login...");
         localStorage.removeItem("jwt");
         localStorage.removeItem("user_info");
         router.push("/login");
-    };
+    }, [router]);
 
     // Fetch all users on component mount
     useEffect(() => {
@@ -59,7 +59,7 @@ const Index = () => {
         };
 
         fetchAllUsers();
-    }, [user?.id, user?.username]);
+    }, [user?.id, user?.username, redirectToLogin]);
 
     // Fetch chats on component mount
     useEffect(() => {
@@ -94,7 +94,7 @@ const Index = () => {
         };
 
         fetchChats();
-    }, [user?.id]);
+    }, [user?.id, redirectToLogin]);
 
     // WebSocket connection
     useEffect(() => {
@@ -151,7 +151,7 @@ const Index = () => {
             setConn(null);
             setMessages([]);
         };
-        }, [selectedChat?.id, user, setConn]);
+        }, [selectedChat?.id, user, setConn, redirectToLogin, selectedChat?.name]);
     
 
     const handleSearch = async (query: string) => {
