@@ -2,6 +2,7 @@ package router
 
 import (
 	"log"
+	"os"
 	"server/internal/middleware"
 	"server/internal/user"
 	"server/internal/ws"
@@ -14,12 +15,20 @@ import (
 
 var r *gin.Engine
 
+func getAllowedOrigins() []string {
+	// Allow different origins for development and production
+	if gin.Mode() == gin.ReleaseMode {
+		return []string{"https://golang-nextjs-chat-app-fe-f621f6c2c0af.herokuapp.com"}
+	}
+	return []string{"http://localhost:3000"}
+}
+
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
 
 	// CORS Configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowOrigins:     getAllowedOrigins(),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -39,7 +48,7 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	// Public Routes
 	r.POST("/signup", userHandler.CreateUser)
 	r.POST("/login", userHandler.Login)
-	r.POST("/auth/refresh-token", userHandler.RefreshToken) // Added Refresh Token Endpoint
+	r.POST("/auth/refresh-token", userHandler.RefreshToken) // Refresh Token Endpoint
 	r.GET("/logout", userHandler.Logout)
 
 	// Validate Token Route
@@ -63,9 +72,12 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 		authRoutes.GET("/getChatMessages/:chatID", wsHandler.GetChatMessages)
 	}
 
-	// OPTIONS Handler
+	// OPTIONS Handler for Preflight Requests
 	r.OPTIONS("/*path", func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
+		origin := c.GetHeader("Origin")
+		if contains(getAllowedOrigins(), origin) {
+			c.Header("Access-Control-Allow-Origin", origin)
+		}
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Header("Access-Control-Allow-Credentials", "true")
@@ -75,6 +87,20 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	})
 }
 
+// Utility to check if a string is in a slice
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func Start(addr string) error {
+	port := os.Getenv("PORT")
+	if port != "" {
+		addr = ":" + port
+	}
 	return r.Run(addr)
 }
