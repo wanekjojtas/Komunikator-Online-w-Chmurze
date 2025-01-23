@@ -1,2 +1,2 @@
-release: heroku pg:psql -a golang-nextjs-chat-app-backend < schema.sql
+release: psql $DATABASE_URL -f schema.sql
 web: go run cmd/main.go
