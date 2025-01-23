@@ -1,52 +1,32 @@
--- Enable necessary extensions
+--Create the `users` table
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
+    username VARCHAR(255) NOT NULL UNIQUE,         
+    email VARCHAR(255) NOT NULL UNIQUE,            
+    password TEXT NOT NULL,                        
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
--- Table: public.chat_members
-CREATE TABLE public.chat_members (
-    chat_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    PRIMARY KEY (chat_id, user_id),
-    FOREIGN KEY (chat_id) REFERENCES public.chats(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES public.users(id)
+-- Create the `chats` table
+CREATE TABLE IF NOT EXISTS chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Chat ID
+    name VARCHAR(255),                             -- Chat name
+    creator_id UUID REFERENCES users(id),          -- ID of the user who created the chat
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Chat creation timestamp
 );
 
--- Table: public.chats
-CREATE TABLE public.chats (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name character varying(255),
-    creator_id uuid,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    FOREIGN KEY (creator_id) REFERENCES public.users(id)
+-- Create the `chat_members` table
+CREATE TABLE IF NOT EXISTS chat_members (
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE, -- Chat ID
+    user_id UUID REFERENCES users(id),                   -- User ID
+    PRIMARY KEY (chat_id, user_id)                       -- Composite primary key
 );
 
--- Table: public.messages
-CREATE TABLE public.messages (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    chat_id uuid,
-    sender_id uuid,
-    content text NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    FOREIGN KEY (chat_id) REFERENCES public.chats(id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_id) REFERENCES public.users(id)
-);
-
--- Table: public.schema_migrations
-CREATE TABLE public.schema_migrations (
-    version bigint NOT NULL,
-    dirty boolean NOT NULL,
-    PRIMARY KEY (version)
-);
-
--- Table: public.users
-CREATE TABLE public.users (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    username character varying(255) NOT NULL,
-    email character varying(255) NOT NULL,
-    password text NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE (email),
-    UNIQUE (username)
+-- Create the `messages` table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),       -- Message ID
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE, -- Chat ID
+    sender_id UUID REFERENCES users(id),                 -- User ID of the sender
+    content TEXT NOT NULL,                               -- Message content
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP       -- Timestamp of the message
 );
