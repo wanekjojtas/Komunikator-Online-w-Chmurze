@@ -1,5 +1,5 @@
 import { NextRouter } from "next/router";
-import { API_URL } from "@/constants";
+import { API_URL } from "@/constants/constants";
 
 const fetchWithAuth = async (
     url: string,

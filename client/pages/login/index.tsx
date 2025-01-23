@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from "react";
 import { useRouter } from "next/router";
 import { AuthContext } from "@/modules/auth_provider";
-import { API_URL } from "../../constants";
+import { API_URL } from "../../constants/constants";
 
 const IndexPage = () => {
   const [email, setEmail] = useState("");

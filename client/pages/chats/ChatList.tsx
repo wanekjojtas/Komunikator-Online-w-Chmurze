@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
-import { API_URL } from "@/constants";
+import { API_URL } from "@/constants/constants";
 import { AuthContext } from "@/modules/auth_provider";
 
 type ChatListProps = {

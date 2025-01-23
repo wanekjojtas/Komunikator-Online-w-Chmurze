@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { WebSocketContext } from "@/modules/websocket_provider";
 import { AuthContext } from "@/modules/auth_provider";
-import { API_URL } from "@/constants";
+import { API_URL } from "@/constants/constants";
 
 type Message = {
     content: string;

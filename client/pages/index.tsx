@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { useRouter } from "next/router";
-import { API_URL } from "../constants";
+import { API_URL } from "../constants/constants";
 import { AuthContext } from "../modules/auth_provider";
 import { WebSocketContext } from "@/modules/websocket_provider";
 
