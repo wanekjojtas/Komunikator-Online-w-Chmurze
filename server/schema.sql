@@ -30,4 +30,3 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,                               -- Message content
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP       -- Timestamp of the message
 );
---dummy
