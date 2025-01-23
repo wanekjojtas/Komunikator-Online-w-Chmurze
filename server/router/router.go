@@ -18,7 +18,7 @@ var r *gin.Engine
 func getAllowedOrigins() []string {
 	// Allow different origins for development and production
 	if gin.Mode() == gin.ReleaseMode {
-		return []string{"https://golang-nextjs-chat-app-fe-f621f6c2c0af.herokuapp.com/"}
+		return []string{"https://golang-nextjs-chat-app-fe-f621f6c2c0af.herokuapp.com"}
 	}
 	return []string{"http://localhost:3000"}
 }
