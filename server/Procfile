@@ -1,1 +1,1 @@
-web: GOOS=linux GOARCH=amd64 go build -o server cmd/main.go
+web: ./bin/cmd
