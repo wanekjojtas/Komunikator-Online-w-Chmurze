@@ -21,6 +21,7 @@ func getAllowedOrigins() []string {
 		if origin == "" {
 			log.Fatalf("FRONTEND_ORIGIN environment variable is not set")
 		}
+		log.Printf("CORS Allowed Origins: %v", origin) // Log allowed origins
 		return []string{origin}
 	}
 	return []string{"http://localhost:3000"}
@@ -28,7 +29,7 @@ func getAllowedOrigins() []string {
 
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
-    r.SetTrustedProxies(nil)
+	r.SetTrustedProxies(nil) // Ensure headers are preserved in Heroku
 
 	// Apply CORS middleware globally
 	r.Use(cors.New(cors.Config{
@@ -40,8 +41,15 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Log all incoming requests except OPTIONS
+	// Security Headers and Performance Improvements Middleware
 	r.Use(func(c *gin.Context) {
+		// Add security headers
+		c.Header("X-Content-Type-Options", "nosniff")     // Prevent MIME sniffing
+		c.Header("Cache-Control", "no-store")             // Disable caching sensitive data
+		c.Header("Content-Type", "application/json; charset=utf-8") // Set charset
+		c.Writer.Header().Del("X-Powered-By")             // Remove X-Powered-By header
+
+		// Log incoming requests except OPTIONS
 		if c.Request.Method != "OPTIONS" {
 			log.Printf("Request: %s %s", c.Request.Method, c.Request.URL.Path)
 			if strings.HasPrefix(c.Request.URL.Path, "/ws/") {
@@ -77,7 +85,6 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 		authRoutes.POST("/sendMessage", wsHandler.SendMessage)
 		authRoutes.GET("/getChatMessages/:chatID", wsHandler.GetChatMessages)
 	}
-
 }
 
 func Start(addr string) error {
