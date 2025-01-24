@@ -16,16 +16,10 @@ import (
 var r *gin.Engine
 
 func getAllowedOrigins() []string {
-	if gin.Mode() == gin.ReleaseMode {
-		origin := os.Getenv("FRONTEND_ORIGIN")
-		if origin == "" {
-			log.Fatalf("FRONTEND_ORIGIN environment variable is not set")
-		}
-		log.Printf("CORS Allowed Origins: %v", origin) // Log allowed origins
-		return []string{origin}
-	}
-	return []string{"http://localhost:3000"}
+    log.Println("Temporarily allowing all origins for debugging.")
+    return []string{"*"}
 }
+
 
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
