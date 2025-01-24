@@ -16,10 +16,8 @@ import (
 var r *gin.Engine
 
 func getAllowedOrigins() []string {
-    log.Println("Temporarily allowing all origins for debugging.")
-    return []string{"*"}
+    return []string{"https://golang-nextjs-chat-app-fe-5a8103231a01.herokuapp.com"}
 }
-
 
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
