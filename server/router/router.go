@@ -16,15 +16,19 @@ import (
 var r *gin.Engine
 
 func getAllowedOrigins() []string {
-	// Allow different origins for development and production
 	if gin.Mode() == gin.ReleaseMode {
-		return []string{"https://golang-nextjs-chat-app-fe-f621f6c2c0af.herokuapp.com"}
+		origin := os.Getenv("FRONTEND_ORIGIN")
+		if origin == "" {
+			log.Fatalf("FRONTEND_ORIGIN environment variable is not set")
+		}
+		return []string{origin}
 	}
 	return []string{"http://localhost:3000"}
 }
 
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
+    r.SetTrustedProxies(nil)
 
 	// Apply CORS middleware globally
 	r.Use(cors.New(cors.Config{
