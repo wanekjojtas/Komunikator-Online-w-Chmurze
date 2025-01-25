@@ -6,6 +6,7 @@ import (
 	"server/internal/middleware"
 	"server/internal/user"
 	"server/internal/ws"
+	"server/util"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 
 	// Apply CORS middleware globally
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://inz-jw.com"},
+		AllowOrigins:     util.GetAllowedOrigins(),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
