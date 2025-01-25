@@ -99,50 +99,60 @@ const Index = () => {
     // WebSocket connection
     useEffect(() => {
         if (!selectedChat?.id || !user) return;
-
+    
         let ws: WebSocket | null = null;
         let reconnectTimeout: NodeJS.Timeout;
-
+        let attemptCount = 0;
+        const maxReconnectAttempts = 5;
+    
         const connectWebSocket = () => {
             const token = localStorage.getItem("jwt");
             if (!token) {
                 redirectToLogin();
                 return;
             }
-
+    
             ws = new WebSocket(
                 `${API_URL.replace("http", "ws")}/ws/joinChat/${selectedChat.id}?userID=${user.id}&username=${user.username}&token=${token}`
             );
-
+    
             ws.onopen = () => {
                 console.log(`Connected to chat: ${selectedChat.name}`);
+                attemptCount = 0; // Reset reconnect attempts on successful connection
             };
-
+    
             ws.onmessage = (event) => {
-                const newMessage = JSON.parse(event.data);
-                setMessages((prev) => [...prev, newMessage]);
-            };
-
-            ws.onclose = (event) => {
-                console.log("WebSocket connection closed:", event.code, event.reason);
-
-                if (event.code === 4001 || event.reason.toLowerCase().includes("token")) {
-                    redirectToLogin();
-                } else if (event.code !== 1000) {
-                    reconnectTimeout = setTimeout(connectWebSocket, 3000);
+                try {
+                    const newMessage = JSON.parse(event.data);
+                    setMessages((prev) => [...prev, newMessage]);
+                } catch (error) {
+                    console.error("Error parsing WebSocket message:", error);
                 }
             };
-
+    
+            ws.onclose = (event) => {
+                console.log("WebSocket connection closed:", event.code, event.reason);
+    
+                if (event.code === 4001 || event.reason.toLowerCase().includes("token")) {
+                    redirectToLogin();
+                } else if (event.code !== 1000 && attemptCount < maxReconnectAttempts) {
+                    attemptCount++;
+                    console.warn(`Reconnect attempt ${attemptCount}/${maxReconnectAttempts}`);
+                    reconnectTimeout = setTimeout(connectWebSocket, 3000 * attemptCount); // Exponential backoff
+                } else if (attemptCount >= maxReconnectAttempts) {
+                    console.error("Max reconnect attempts reached. Giving up.");
+                }
+            };
+    
             ws.onerror = (error) => {
                 console.error("WebSocket error:", error);
-                redirectToLogin();
             };
-
+    
             setConn(ws);
         };
-
+    
         connectWebSocket();
-
+    
         return () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.close(1000, "Client disconnected");
@@ -151,8 +161,7 @@ const Index = () => {
             setConn(null);
             setMessages([]);
         };
-        }, [selectedChat?.id, user, setConn, redirectToLogin, selectedChat?.name]);
-    
+    }, [selectedChat?.id, user, setConn, redirectToLogin, selectedChat?.name]);    
 
     const handleSearch = async (query: string) => {
         setSearchQuery(query);

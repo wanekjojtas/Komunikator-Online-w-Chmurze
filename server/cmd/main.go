@@ -34,7 +34,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load chats into Hub: %v", err)
 	}
-	go hub.Run()
+	go hub.Run(dbConn.GetDB())
 
 	wsHandler := ws.NewHandler(hub, dbConn.GetDB())
 

@@ -19,14 +19,13 @@ type Client struct {
 }
 
 type Message struct {
-    ID        string    `json:"id"`        // Message ID
-    RoomID    string    `json:"roomID"`    // Chat/Room ID
-    SenderID  string    `json:"senderID"`  // Sender's user ID
-    Username  string    `json:"username"`  // Sender's username
-    Content   string    `json:"content"`   // Message content
-    CreatedAt time.Time `json:"createdAt"` // Timestamp of the message
+	ID        string    `json:"id"`        // Message ID
+	RoomID    string    `json:"roomID"`    // Chat/Room ID
+	SenderID  string    `json:"senderID"`  // Sender's user ID
+	Username  string    `json:"username"`  // Sender's username
+	Content   string    `json:"content"`   // Message content
+	CreatedAt time.Time `json:"createdAt"` // Timestamp of the message
 }
-
 
 func (c *Client) writeMessage() {
 	defer c.Conn.Close()
@@ -41,51 +40,71 @@ func (c *Client) writeMessage() {
 	}
 }
 
-
 func (c *Client) readMessage(hub *Hub) {
-    defer func() {
-        // Ensure cleanup on disconnect
-        log.Printf("Client %s disconnected from chat %s", c.ID, c.RoomID)
-        hub.Unregister <- c
-        c.Conn.Close()
-    }()
+	defer func() {
+		// Ensure cleanup on disconnect
+		log.Printf("Client %s disconnected from chat %s", c.ID, c.RoomID)
+		hub.Unregister <- c
+		c.Conn.Close()
+	}()
 
-    for {
-        // Read the message from the WebSocket connection
-        _, messageBytes, err := c.Conn.ReadMessage()
-        if err != nil {
-            if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-                log.Printf("Unexpected WebSocket closure for client %s: %v", c.ID, err)
-            } else {
-                log.Printf("WebSocket closed normally for client %s: %v", c.ID, err)
-            }
-            break
-        }
+	// Set up ping/pong handlers
+	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	c.Conn.SetPongHandler(func(appData string) error {
+		log.Printf("Received Pong from client %s", c.ID)
+		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
 
-        // Create a new message object
-        msg := &Message{
-            ID:        uuid.New().String(),
-            RoomID:    c.RoomID,
-            SenderID:  c.ID,
-            Username:  c.Username,
-            Content:   string(messageBytes),
-            CreatedAt: time.Now(),
-        }
+	for {
+		// Read the message from the WebSocket connection
+		_, messageBytes, err := c.Conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Unexpected WebSocket closure for client %s: %v", c.ID, err)
+			} else {
+				log.Printf("WebSocket closed normally for client %s: %v", c.ID, err)
+			}
+			break
+		}
 
-        // Save the message to the database
-        _, dbErr := c.DB.Exec(
-            "INSERT INTO messages (id, chat_id, sender_id, content, created_at) VALUES ($1, $2, $3, $4, $5)",
-            msg.ID, msg.RoomID, msg.SenderID, msg.Content, msg.CreatedAt,
-        )
-        if dbErr != nil {
-            log.Printf("Failed to save message from client %s to database: %v", c.ID, dbErr)
-        } else {
-            log.Printf("Message saved to database: %+v", msg)
-        }
+		// Create a new message object
+		msg := &Message{
+			ID:        uuid.New().String(),
+			RoomID:    c.RoomID,
+			SenderID:  c.ID,
+			Username:  c.Username,
+			Content:   string(messageBytes),
+			CreatedAt: time.Now(),
+		}
 
-        // Broadcast the message to other clients in the chat room
-        hub.Broadcast <- msg
-    }
+		// Save the message to the database
+		_, dbErr := c.DB.Exec(
+			"INSERT INTO messages (id, chat_id, sender_id, content, created_at) VALUES ($1, $2, $3, $4, $5)",
+			msg.ID, msg.RoomID, msg.SenderID, msg.Content, msg.CreatedAt,
+		)
+		if dbErr != nil {
+			log.Printf("Failed to save message from client %s to database: %v", c.ID, dbErr)
+		} else {
+			log.Printf("Message saved to database: %+v", msg)
+		}
+
+		// Broadcast the message to other clients in the chat room
+		hub.Broadcast <- msg
+	}
 }
 
+// StartHeartbeat starts a periodic ping to the WebSocket client to keep the connection alive.
+func (c *Client) StartHeartbeat() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 
+	for range ticker.C {
+		err := c.Conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second))
+		if err != nil {
+			log.Printf("Failed to send Ping to client %s: %v", c.ID, err)
+			break
+		}
+		log.Printf("Sent Ping to client %s", c.ID)
+	}
+}

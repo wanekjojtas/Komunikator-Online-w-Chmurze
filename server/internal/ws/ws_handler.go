@@ -26,11 +26,19 @@ func NewHandler(h *Hub, db *sql.DB) *Handler {
 }
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+    ReadBufferSize:  1024,
+    WriteBufferSize: 1024,
+    CheckOrigin: func(r *http.Request) bool {
+        origin := r.Header.Get("Origin")
+        allowedOrigins := util.GetAllowedOrigins()
+        for _, allowed := range allowedOrigins {
+            if origin == allowed {
+                return true
+            }
+        }
+        return false
+    },
+    HandshakeTimeout: 10 * time.Second,
 }
 
 // ValidateToken validates the JWT token.
@@ -254,18 +262,18 @@ func (h *Handler) JoinChat(c *gin.Context) {
         return
     }
 
-    claims, err := util.ValidateToken(token,false)
+    claims, err := util.ValidateToken(token, false)
     if err != nil || claims.ID != userID || claims.Username != username {
-        log.Printf("Invalid token or token mismatch for user: %s", username)
+        log.Printf("Invalid token or token mismatch for user: %s, Error: %v", username, err)
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
         return
     }
 
-    // Validate that the chat exists in the `chats` table
+    // Check if chat exists
     var chatExists bool
     err = h.db.QueryRow("SELECT EXISTS (SELECT 1 FROM chats WHERE id = $1)", chatID).Scan(&chatExists)
     if err != nil {
-        log.Printf("Error checking chat existence for ChatID=%s: %v", chatID, err)
+        log.Printf("Database error while checking chat existence for ChatID=%s: %v", chatID, err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
         return
     }
@@ -276,13 +284,15 @@ func (h *Handler) JoinChat(c *gin.Context) {
         return
     }
 
-    // Synchronize chat with hub if missing
+    // Synchronize chat with hub if missing (thread-safe)
+    h.hub.mu.Lock()
     if _, exists := h.hub.Chats[chatID]; !exists {
         log.Printf("Chat %s not found in hub, synchronizing with database", chatID)
 
         var chatName string
         err := h.db.QueryRow("SELECT name FROM chats WHERE id = $1", chatID).Scan(&chatName)
         if err != nil {
+            h.hub.mu.Unlock()
             log.Printf("Error fetching chat name for ChatID=%s: %v", chatID, err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
             return
@@ -295,6 +305,7 @@ func (h *Handler) JoinChat(c *gin.Context) {
         }
         log.Printf("Chat %s synchronized with hub", chatID)
     }
+    h.hub.mu.Unlock()
 
     // Validate user membership in the chat
     var isMember bool
@@ -306,7 +317,7 @@ func (h *Handler) JoinChat(c *gin.Context) {
         )
     `, chatID, userID).Scan(&isMember)
     if err != nil {
-        log.Printf("Error validating user membership: %v", err)
+        log.Printf("Error validating user membership for ChatID=%s, UserID=%s: %v", chatID, userID, err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
         return
     }
@@ -317,7 +328,7 @@ func (h *Handler) JoinChat(c *gin.Context) {
         return
     }
 
-    // WebSocket connection upgrade
+    // Upgrade to WebSocket
     conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
     if err != nil {
         log.Printf("WebSocket upgrade failed: %v", err)
@@ -334,16 +345,23 @@ func (h *Handler) JoinChat(c *gin.Context) {
         DB:       h.db,
     }
 
-    // Add client to the chat room
+    // Add client to the chat room in a thread-safe manner
+    h.hub.mu.Lock()
     h.hub.Chats[chatID].Members[userID] = client
+    h.hub.mu.Unlock()
+
     log.Printf("User %s joined chat %s", username, chatID)
 
     defer func() {
+        h.hub.mu.Lock()
         delete(h.hub.Chats[chatID].Members, userID)
+        h.hub.mu.Unlock()
         client.Conn.Close()
+        log.Printf("User %s left chat %s", username, chatID)
     }()
 
     // Start WebSocket read/write handling
+    go client.StartHeartbeat()
     go client.writeMessage()
     client.readMessage(h.hub)
 }

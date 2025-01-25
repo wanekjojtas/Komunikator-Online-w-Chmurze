@@ -6,6 +6,7 @@ import (
 	"server/internal/middleware"
 	"server/internal/user"
 	"server/internal/ws"
+	"server/util"
 	"strings"
 	"time"
 
@@ -15,24 +16,13 @@ import (
 
 var r *gin.Engine
 
-func getAllowedOrigins() []string {
-    allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
-    if allowedOrigins == "" {
-        log.Println("ALLOWED_ORIGINS is not set, using default localhost")
-        return []string{"http://localhost:3000"}
-    }
-    log.Printf("CORS Allowed Origins: %s", allowedOrigins)
-    return strings.Split(allowedOrigins, ",")
-}
-
-
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
 	r.SetTrustedProxies(nil) // Ensure headers are preserved in Heroku
 
 	// Apply CORS middleware globally
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     getAllowedOrigins(),
+		AllowOrigins:     util.GetAllowedOrigins(),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
