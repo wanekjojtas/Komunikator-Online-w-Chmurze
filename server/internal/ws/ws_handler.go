@@ -246,7 +246,7 @@ func uniqueMembers(members []string) []string {
     return result
 }
 
-// JoinChat establishes a WebSocket connection to a chat room.
+// Establish a WebSocket connection to a chat room.
 func (h *Handler) JoinChat(c *gin.Context) {
     chatID := c.Param("chatID")
     userID := c.Query("userID")
